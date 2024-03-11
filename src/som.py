@@ -281,12 +281,14 @@ class SOM(object):
         # Update all the neighbouring neurons.
         # NB: The '+1' is added because the upper limit is exclusive.
         for i in range(row - r_loc, row + r_loc + 1):
+
             # Avoid going out of bounds.
             if out_of_bounds(i):
                 continue
             # _end_check_
 
             for j in range(col - r_loc, col + r_loc + 1):
+
                 # Avoid going out of bounds.
                 if out_of_bounds(j):
                     continue
@@ -306,7 +308,7 @@ class SOM(object):
     def _compute_u_matrix(self):
         """
         Description:
-        Computes the U-Matrix of the SOM network. This is for visualization squashes
+        Computes the U-Matrix of the SOM network. This visualization squashes
         the 3D network map into a 2D image.
         """
         # Add the matrix on the first call.
@@ -541,7 +543,8 @@ class SOM(object):
 
     # _end_def_
 
-    def u_matrix(self, copy=False):
+    @property
+    def u_matrix(self):
         """
         Description:
         Accessor (get) of the U-Matrix.
@@ -550,22 +553,22 @@ class SOM(object):
         """
 
         # Check if the matrix exists.
-        if self._uMat:
+        if not self._uMat:
             self._compute_u_matrix()
         # _end_if_
 
-        return self._uMat.copy() if copy else self._uMat
+        return self._uMat
 
     # _end_def_
 
-    def get_map(self, copy=False):
+    @property
+    def get_map(self):
         """
         Description:
-        Returns the neurons [(MxMxd) weights of the SOM].
-        - copy: if True it will return a copy.
+        Returns the neurons [(M x M x d) weights of the SOM].
         """
-        # Return the neurons (or a copy of them).
-        return self._neurons.copy() if copy else self._neurons
+        # Return the neurons.
+        return self._neurons
 
     # _end_def_
 
@@ -597,7 +600,7 @@ class SOM(object):
                 f5.create_dataset("network_map", data=self._neurons)
 
                 # If the uMat does not exist, it will be created.
-                f5.create_dataset("uMatrix", data=self.u_matrix())
+                f5.create_dataset("uMatrix", data=self.u_matrix)
 
                 # Check if the errors exists as attribute.
                 if hasattr(self, "errors"):
