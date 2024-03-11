@@ -421,7 +421,7 @@ class SOM(object):
             l_rate = max(1.0e-5, min(l_rate, 1.0))
 
             # Constant function (ignore the input).
-            def eta(ik=None):
+            def eta(_):
                 return l_rate
         else:
             # Slowly decaying exponential functions.
@@ -623,7 +623,9 @@ class SOM(object):
         return str(" -- Self Organizing Map --\n"
                    " Network dimensions: {0}\n"
                    " Distance metric: {1}\n"
-                   " Initialization limits: {2}\n".format(self._neurons.shape, self._metric, self._limits))
+                   " Initialization limits: {2}\n".format(self._neurons.shape,
+                                                          self._metric,
+                                                          self._limits))
     # _end_def_
 
 # _end_class_
