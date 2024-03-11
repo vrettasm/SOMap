@@ -11,10 +11,13 @@ from numpy.linalg import norm as la_norm
 __all__ = ['SOM']
 
 # Current version.
-__version__ = '0.0.1'
+__version__ = '0.1.0'
 
 # Author.
-__author__ = "Michalis Vrettas, PhD - Email: michail.vrettas@gmail.com"
+__author__ = "Michalis Vrettas, PhD"
+
+# Email.
+__email__ = "michail.vrettas@gmail.com"
 
 
 # Self Organizing Map class.
@@ -22,20 +25,24 @@ class SOM(object):
     """
     Description:
     This class implements a Self-Organizing-Map algorithm. Steps in brief:
+
     1) Initialize the weight vectors in the map (network nodes) using uniformly
     random values between a predefined range. The default range: (-1, 1) can be
     set only during the construction of the object.
 
     2) Randomly pick an input (training) vector. The order of the input vectors
     changes periodically every 'N' epochs.
+
     3) Traverse each node in the map:
        3.1) Use the Euclidean distance formula (i.e. norm) to find similarities
             between the input vector and the map's weight vectors
        3.2) Track the node that produces the smallest distance (this node is the
             best matching unit -- BMU)
+
     4) Update the weight vectors of the nodes in the neighborhood of the BMU
     (including the BMU itself) by pulling them closer to the input vector.
-    5) Repeat from step 2 until convergence (or a maximum number of iteration
+
+    5) Repeat from step [2] until convergence (or a maximum number of iteration
     has been reached). Here convergence is measured with the mean absolute error,
     but we can also change it to something more suitable if necessary.
     """
@@ -48,18 +55,15 @@ class SOM(object):
         always the same as the size of the input vectors 'd'.
 
         Args:
-        - m: grid size (mxm).
+        - m: grid size (m x m).
         - d: neuron size (always same as input vector size).
         - u_range: the range of the uniform numbers in the initialization
-        (default=(-1, 1) ).
+        (default=(-1, 1)).
         - metric: string determining the way to compute the distance between
         the nodes in the update stage.
 
-        Supported metrics are: 'braycurtis', 'canberra', 'chebyshev', 'cityblock',
-        'correlation', 'cosine', 'dice', 'euclidean', 'hamming', 'jaccard', 'jensenshannon',
-        'kulsinski', 'mahalanobis', 'matching', 'minkowski', 'rogerstanimoto', 'russellrao',
-        'seuclidean', 'sokalmichener', 'sokalsneath', 'sqeuclidean', 'wminkowski', 'yule'.
-        Basically support all the scipy.spatial.distances with default parameters.
+        Supported metrics are: all the scipy.spatial.distances with default
+        parameters.
 
         Note:
         The constructor can also accept a string which can be converted to a
@@ -67,10 +71,14 @@ class SOM(object):
         then a ValueError exception will be raised.
 
         Raises:
-        - ValueError: If any of the inputs is non-positive, or the range
-        limits (low, high) are not ordered correctly. Also if the chosen metric
-        is not on the list with the supported values.
+        - ValueError: If any of the inputs is non-positive, or the range limits
+        (low, high) are not ordered correctly. Also, if the chosen metric is not
+        on the list with the supported values.
         """
+
+        # Create a random number generator.
+        self._rng = np.random.default_rng()
+
         # Make sure the inputs are integer values.
         # NOTE: This will raise an error if the conversion fails.
         self._m = int(m)
@@ -78,11 +86,11 @@ class SOM(object):
 
         # Negative values for grid size are not permitted.
         if self._m < 1:
-            raise ValueError(" SOM: Grid size input 'M' can't be negative: {0}".format(self._m))
+            raise ValueError(f" SOM: Grid size input 'M' can't be negative: {self._m}")
         # _end_if_
 
         if self._d < 1:
-            raise ValueError(" SOM: Input vector size 'd' can't be negative: {0}".format(self._d))
+            raise ValueError(f" SOM: Input vector size 'd' can't be negative: {self._d}")
         # _end_if_
 
         # Get the [low, high] limits of the uniform numbers.
@@ -94,7 +102,7 @@ class SOM(object):
         # _end_check_
 
         # Uniformly distributed random numbers: U(low, high).
-        self._neurons = low_lim + (high_lim - low_lim) * np.random.rand(m, m, d)
+        self._neurons = low_lim + (high_lim - low_lim) * self._rng.random((m, m, d))
 
         # Add the limits in the object.
         self._limits = (low_lim, high_lim)
@@ -107,7 +115,11 @@ class SOM(object):
             # Set the metric as object variable.
             self._metric = metric
         else:
-            raise ValueError(" SOM: Unknown metric selected: {0}.".format(metric))
+            raise ValueError(f" SOM: Unknown metric selected: {metric}.")
+        # _end_if_
+
+        # Placeholder for U-Matrix.
+        self._uMat = None
 
     # _end_def_
 
@@ -166,15 +178,16 @@ class SOM(object):
         """
         # If the user has given a seed USE IT!
         if r_seed:
-            np.random.seed(int(r_seed))
+            self._rng = np.random.default_rng(int(r_seed))
         # _end_seed_
 
         # Get the limits of the object.
         low_lim, high_lim = self._limits
 
         # Uniformly distributed random numbers.
-        self._neurons = low_lim + (high_lim - low_lim) * np.random.rand(self._m, self._m, self._d)
-
+        self._neurons = low_lim + (high_lim - low_lim) * self._rng.random((self._m,
+                                                                           self._m,
+                                                                           self._d))
     # _end_def_
 
     def find_nearest_node(self, vec):
@@ -235,7 +248,7 @@ class SOM(object):
             - x_{j} is the current input vector.
 
         Note(2):
-        The localization radius (window of influence) is starting by inlcuding the whole
+        The localization radius (window of influence) is starting by including the whole
         network, and gradually, in time, it reduces  to a single node.  This approach of
         localization could be revisited.
         """
@@ -262,7 +275,7 @@ class SOM(object):
         # Max radius size.
         r_max = int(0.5 * self._m - 1)
 
-        # Estimate the local radius, around the center: [0 .. r_max].
+        # Estimate the local radius, around the center: [0, r_max].
         r_loc = int(r_max * 0.98 ** tk)
 
         # Update all the neighbouring neurons.
@@ -296,15 +309,15 @@ class SOM(object):
         Computes the U-Matrix of the SOM network. This is for visualization squashes
         the 3D network map into a 2D image.
         """
-        # Add the attribute on the first call.
-        if not hasattr(self, "_uMat"):
+        # Add the matrix on the first call.
+        if self._uMat is None:
             # Estimate the dimensions of the U-Matrix.
             m = 2 * self._m - 1
 
             # Set the matrix in the object.
-            setattr(self, "_uMat", np.zeros((m, m)))
+            self._uMat = np.zeros((m, m))
         else:
-            # By default U-Matrix is cleared before computed.
+            # By default, U-Matrix is cleared before computed.
             self._uMat *= 0
         # _end_check_
 
@@ -420,7 +433,7 @@ class SOM(object):
         row, col = x.shape
 
         # Check the dimensionality of training data with that
-        # of the neurons in the SOM network. The should match.
+        # of the neurons in the SOM network. They should match.
         if col != self._d:
             raise ValueError(" SOM.train: Dimension mismatch.")
         # _end_if_
@@ -437,7 +450,7 @@ class SOM(object):
         x_range = np.arange(row)
 
         # Perturb the order of the input samples (in-place).
-        np.random.shuffle(x_range)
+        self._rng.shuffle(x_range)
 
         # Track the error (for further analysis).
         epoch_error = np.zeros(nit)
@@ -494,7 +507,7 @@ class SOM(object):
                       format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), i + 1, epoch_error[i]))
 
                 # Perturb the order of input vectors.
-                np.random.shuffle(x_range)
+                self._rng.shuffle(x_range)
             # _end_update_
         # _end_epochs_
 
@@ -537,7 +550,7 @@ class SOM(object):
         """
 
         # Check if the matrix exists.
-        if not hasattr(self, "_uMat"):
+        if self._uMat:
             self._compute_u_matrix()
         # _end_if_
 
@@ -560,7 +573,7 @@ class SOM(object):
         """
         Description:
         Saves the current network as HDF5 file. If the network is "untrained"
-        the field 'errors' will  not exist. Hence an  warning message will be
+        the field 'errors' will not exist. Hence, a warning message will be
         prompted. The UMatrix will be created on the current map (if it isn't
         created yet).
 
@@ -578,7 +591,7 @@ class SOM(object):
 
             # Open the hdf5 file for write.
             with hdf5_File(filename, fmode) as f5:
-                # These fields should always exists in the object.
+                # These fields should always exist in the object.
                 f5.create_dataset("init_limits", data=self._limits)
                 f5.create_dataset("dist_metric", data=self._metric)
                 f5.create_dataset("network_map", data=self._neurons)
