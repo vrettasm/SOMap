@@ -3,6 +3,8 @@ import time
 import numpy as np
 
 # Specific imports.
+from numba import njit
+from pathlib import Path
 from datetime import datetime
 from scipy.spatial import distance
 from numpy.linalg import norm as la_norm
@@ -47,7 +49,8 @@ class SOM(object):
     but we can also change it to something more suitable if necessary.
     """
 
-    def __init__(self, m=11, d=1, u_range=(-1, 1), metric='euclidean'):
+    def __init__(self, m: int = 11, d: int = 1, u_range: tuple = (-1, 1),
+                 metric: str = 'euclidean'):
         """
         Description:
         Constructor for a self-organizing-map object. The network is assumed
@@ -164,7 +167,7 @@ class SOM(object):
 
     # _end_def_
 
-    def reset_network(self, r_seed=None):
+    def reset_network(self, r_seed: int = None):
         """
         Description:
         Re-initializes the neurons with random values. It uses the same
@@ -190,7 +193,7 @@ class SOM(object):
                                                                            self._d))
     # _end_def_
 
-    def find_nearest_node(self, vec):
+    def find_nearest_node(self, vec: np.array):
         """
         Description:
         Finds the closest node of the grid (i.e. shortest distance) to the input vector.
@@ -202,8 +205,8 @@ class SOM(object):
             - a tuple with the coordinates, on the map, of the winner node (best matching unit).
 
         Note:
-        We use vectorizations to speed up performance.  This is optimized for the default
-        'Euclidean' distances, by using np.linalg.norm() function. Other distance metrics
+        We use vectorization to speed up performance. This is optimized for the default
+        'Euclidean' distance, by using np.linalg.norm() function. Other distance metrics
         can also be exploited using scipy.spatial.distance package.
         """
 
@@ -225,7 +228,22 @@ class SOM(object):
 
     # _end_def_
 
-    def _update_nodes(self, t_node, vec, eta, tk):
+    # Local RBF kernel function.
+    @staticmethod
+    @njit
+    def rbf(u: np.array, sig: float) -> float:
+        return np.exp(-0.5 * u.dot(u) / sig)
+    # _end_def_
+
+    # Local bounds check function.
+    # NOTE: This works because the network is assumed m*m.
+    @staticmethod
+    @njit
+    def out_of_bounds(upper_bound: int, lx: int) -> bool:
+        return lx < 0 or lx >= upper_bound
+    # _end_def_
+
+    def _update_nodes(self, t_node: tuple, vec: np.array, eta: float, tk: int):
         """
         Description:
         Updates the nodes (weights of the network) by centering the peak at the t_node.
@@ -253,15 +271,6 @@ class SOM(object):
         localization could be revisited.
         """
 
-        # Local RBF kernel function.
-        def rbf(u, sig):
-            return np.exp(-0.5 * u.dot(u) / sig)
-
-        # Local bounds check function.
-        # NOTE: This works because the network is assumed m*m.
-        def out_of_bounds(lx):
-            return lx < 0 or lx >= self._m
-
         # Extract the (row, col) of the node.
         row, col = t_node
 
@@ -283,14 +292,14 @@ class SOM(object):
         for i in range(row - r_loc, row + r_loc + 1):
 
             # Avoid going out of bounds.
-            if out_of_bounds(i):
+            if self.out_of_bounds(self._m, i):
                 continue
             # _end_check_
 
             for j in range(col - r_loc, col + r_loc + 1):
 
                 # Avoid going out of bounds.
-                if out_of_bounds(j):
+                if self.out_of_bounds(self._m, j):
                     continue
                 # _end_check_
 
@@ -298,7 +307,7 @@ class SOM(object):
                 d_ij = mu - [i, j]
 
                 # Update the weights.
-                self._neurons[i, j] += eta * rbf(d_ij, sigma) * (vec - self._neurons[i, j])
+                self._neurons[i, j] += eta * self.rbf(d_ij, sigma) * (vec - self._neurons[i, j])
             # _end_columns_
 
         # _end_rows_
@@ -397,7 +406,8 @@ class SOM(object):
 
     # _end_def_
 
-    def train(self, x, epochs=100, tol=1.0e-5, l_rate=None, n_update=10):
+    def train(self, x: np.ndarray, epochs: int = 100, tol: float = 1.0e-5,
+              l_rate: float = None, n_update: int = 10):
         """
         Description:
         Train the network for 'epochs' iterations. This is the main fitting
@@ -572,7 +582,7 @@ class SOM(object):
 
     # _end_def_
 
-    def save_som_to_hdf(self, filename, overwrite=False):
+    def save_som_to_hdf(self, filename: Path, overwrite: bool = False):
         """
         Description:
         Saves the current network as HDF5 file. If the network is "untrained"
@@ -620,12 +630,10 @@ class SOM(object):
         Description:
         Defines the way to print a SOM object.
         """
-        return str(" -- Self Organizing Map --\n"
-                   " Network dimensions: {0}\n"
-                   " Distance metric: {1}\n"
-                   " Initialization limits: {2}\n".format(self._neurons.shape,
-                                                          self._metric,
-                                                          self._limits))
+        return str(f" -- Self Organizing Map --\n"
+                   f" Network dimensions: {self._neurons.shape}\n"
+                   f" Distance metric: {self._metric}\n"
+                   f" Initialization limits: {self._limits}\n")
     # _end_def_
 
 # _end_class_
