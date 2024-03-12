@@ -230,7 +230,6 @@ class SOM(object):
 
     # Local RBF kernel function.
     @staticmethod
-    @njit
     def rbf(u: np.array, sig: float) -> float:
         return np.exp(-0.5 * u.dot(u) / sig)
     # _end_def_
@@ -563,7 +562,7 @@ class SOM(object):
         """
 
         # Check if the matrix exists.
-        if not self._uMat:
+        if self._uMat is None:
             self._compute_u_matrix()
         # _end_if_
 
