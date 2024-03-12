@@ -101,7 +101,8 @@ class SOM(object):
 
         # Sanity check.
         if low_lim >= high_lim:
-            raise ValueError(" SOM: Input limits are invalid. NOTE: u_range = (low_lim, high_lim).")
+            raise ValueError(" SOM: Input limits are invalid."
+                             " NOTE: u_range = (low_lim, high_lim).")
         # _end_check_
 
         # Uniformly distributed random numbers: U(low, high).
@@ -124,6 +125,9 @@ class SOM(object):
         # Placeholder for U-Matrix.
         self._uMat = None
 
+        # Initialize the trained flag.
+        self._is_trained = False
+
     # _end_def_
 
     @property
@@ -131,7 +135,7 @@ class SOM(object):
         """
         Description:
         Accessor (get) for the grid size of the SOM network.
-        It is assumed that the grid is square (e.g. MxM).
+        It is assumed that the grid is square (e.g. M x M).
         """
         return self._m
 
@@ -167,17 +171,30 @@ class SOM(object):
 
     # _end_def_
 
+    @property
+    def get_map(self):
+        """
+        Description:
+        Returns the neurons [(M x M x d) weights of the SOM].
+        """
+        # Return the neurons.
+        return self._neurons
+
+    # _end_def_
+
     def reset_network(self, r_seed: int = None):
         """
         Description:
-        Re-initializes the neurons with random values. It uses the same
-        range limits: (low, high) as the ones given in the constructor.
+            Re-initializes the neurons with random values. It uses the same
+            range limits: (low, high) as the ones given in the constructor.
+
         Args:
-        - r_seed: random seed for the reset of the network. If no value
-        is given then the seed is not reset.
+            - r_seed: random seed for the reset of the network. If no value
+            is given then the seed is not reset.
+
         NOTE:
-        The old values of the _neurons will be overwritten. No warnings
-        or extra care is taken.
+            The old values of the _neurons will be overwritten. No warnings
+            or extra care is taken.
         """
         # If the user has given a seed USE IT!
         if r_seed:
@@ -191,6 +208,8 @@ class SOM(object):
         self._neurons = low_lim + (high_lim - low_lim) * self._rng.random((self._m,
                                                                            self._m,
                                                                            self._d))
+        # Reset the trained flag.
+        self._is_trained = False
     # _end_def_
 
     def find_nearest_node(self, vec: np.array):
@@ -325,7 +344,7 @@ class SOM(object):
             m = 2 * self._m - 1
 
             # Set the matrix in the object.
-            self._uMat = np.zeros((m, m))
+            self._uMat = np.zeros((m, m), dtype=float)
         else:
             # By default, U-Matrix is cleared before computed.
             self._uMat *= 0
@@ -477,6 +496,7 @@ class SOM(object):
 
         # Run maximum 'epoch' iterations.
         for i in range(nit):
+
             # Initial copy of the network.
             grid_i = self._neurons.copy()
 
@@ -550,6 +570,40 @@ class SOM(object):
         # Compute the uMatrix (for consistency).
         self._compute_u_matrix()
 
+        # Set trained flag.
+        self._is_trained = True
+
+    # _end_def_
+
+    def predict(self, X):
+        """
+        Predict cluster for each element in X, by estimating the position
+        of the nearest matching unit.
+
+        Args:
+        -----
+        X : ndarray
+            An ndarray of shape (n, self._d) where 'n' is the number of samples.
+
+        Returns:
+        -------
+        predicted_labels : ndarray
+            An ndarray of shape (n,). The predicted cluster index for each item
+            in X.
+        """
+
+        # Check to make sure SOM has been fit.
+        if not self._is_trained:
+            raise RuntimeError(" SOM object is not trained yet.")
+        # _end_if_
+
+        # Check the dimensions of the input data.
+        if X.shape[1] != self._d:
+            raise RuntimeError(" Dimensions mismatch.")
+        # _end_if_
+
+        # An array with all the predicted index values.
+        return np.array([self.find_nearest_node(x) for x in X])
     # _end_def_
 
     @property
@@ -567,17 +621,6 @@ class SOM(object):
         # _end_if_
 
         return self._uMat
-
-    # _end_def_
-
-    @property
-    def get_map(self):
-        """
-        Description:
-        Returns the neurons [(M x M x d) weights of the SOM].
-        """
-        # Return the neurons.
-        return self._neurons
 
     # _end_def_
 
