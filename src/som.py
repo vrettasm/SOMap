@@ -637,6 +637,11 @@ class SOM(object):
             - overwrite: if True it will overwrite the file, if it exists.
         """
 
+        # Check to make sure SOM has been fit.
+        if not self._is_trained:
+            raise RuntimeError(" SOM.saveNetToHDF: SOM object is not trained yet.")
+        # _end_if_
+
         # Import the HDF5 File locally.
         from h5py import File as hdf5_File
 
@@ -658,11 +663,12 @@ class SOM(object):
                 if hasattr(self, "errors"):
                     f5.create_dataset("epoch_error", data=self.errors)
                 else:
-                    print(" SOM.saveNetToHDF: Network does not seem to be trained.")
+                    raise RuntimeError("Error statistics are missing.")
                 # _end_if_
+
             # _end_with_file_
         except Exception as e0:
-            raise RuntimeError(" SOM.saveMapToHDF: {0}".format(e0))
+            print(" SOM.saveMapToHDF: Unable to save the network. {0}".format(e0))
         # _end_try_
 
     # _end_def_
