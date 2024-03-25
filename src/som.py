@@ -297,7 +297,7 @@ class SOM(object):
 
         # Characteristic length scale. Controls how fast the weights
         # will decrease as they move away from the center vector mu.
-        sigma = 1.0
+        sigma = float(1.0)
 
         # Max radius size.
         r_max = int(0.5 * self._m - 1)
@@ -424,15 +424,14 @@ class SOM(object):
 
     # _end_def_
 
-    def train(self, x: np.ndarray, epochs: int = 100, tol: float = 1.0e-5,
-              l_rate: float = None, n_update: int = 10):
+    def train(self, x: np.ndarray, epochs: int = 100, tol: float = 1.0e-5, l_rate: float = None,
+              n_update: int = 10):
         """
         Description:
-        Train the network for 'epochs' iterations. This is the main fitting
-        process.
+        Train the network for 'epochs' iterations. This is the main fitting process.
 
         Args:
-        - x: training dataset (NxD)
+        - x: training dataset (N x D)
         - epochs: maximum number of iterations
         - tol: tolerance to terminate the fit process
         - l_rate: learning rate (e.g. 0.01). If no value is given it will
@@ -485,6 +484,9 @@ class SOM(object):
         # Track the error (for further analysis).
         epoch_error = np.zeros(nit)
 
+        # Track the learning rate (for further analysis).
+        epoch_eta = np.zeros(nit)
+
         # Converged tuple: (flag, iteration).
         has_converged = (False, 0)
 
@@ -512,6 +514,9 @@ class SOM(object):
 
             # NOTE: Here we use the mean absolute error (MAE).
             epoch_error[i] = np.sum(np.abs(grid_i - self._neurons)) / self._neurons.size
+
+            # Copy the learning rate value.
+            epoch_eta[i] = eta(i)
 
             # Check for convergence. Let it run for a few iterations.
             if i > 50:
@@ -559,12 +564,18 @@ class SOM(object):
 
             # Store the errors up to k-th iteration.
             setattr(self, "errors", epoch_error[0:k])
+
+            # Store the learning rate values up to k-th iteration.
+            setattr(self, "eta", epoch_eta[0:k])
         else:
             print(" SOM training finished with error {0:.6f}.".
                   format(epoch_error[-1]))
 
             # Include the errors in the object.
             setattr(self, "errors", epoch_error)
+
+            # Include the learning rates in the object.
+            setattr(self, "eta", epoch_eta)
         # _end_if_
 
         # Compute the uMatrix (for consistency).
@@ -586,7 +597,7 @@ class SOM(object):
             An ndarray of shape (n, self._d) where 'n' is the number of samples.
 
         Returns:
-        -------
+        --------
         predicted_labels : ndarray
             An ndarray of shape (n,). The predicted cluster index for each item
             in X.
