@@ -424,19 +424,19 @@ class SOM(object):
 
     # _end_def_
 
-    def train(self, x: np.ndarray, epochs: int = 100, tol: float = 1.0e-5, l_rate: float = None,
+    def train(self, x: np.ndarray, epochs: int = 100, tol: float = 1.0e-6, l_rate: float = None,
               n_update: int = 10):
         """
         Description:
         Train the network for 'epochs' iterations. This is the main fitting process.
 
         Args:
-        - x: training dataset (N x D)
-        - epochs: maximum number of iterations
-        - tol: tolerance to terminate the fit process
-        - l_rate: learning rate (e.g. 0.01). If no value is given it will
-        use a slowly decaying exponential function and will reduce in runtime.
-        - n_update: number of iterations to display progress
+            - x: training dataset (N x D)
+            - epochs: maximum number of iterations
+            - tol: tolerance to terminate the fit process
+            - l_rate: learning rate (e.g. 0.01). If no value is given it will
+              use a slowly decaying exponential function and will reduce in runtime.
+            - n_update: number of iterations to display progress
         """
         # Local learning rate function.
         if l_rate:
@@ -527,7 +527,7 @@ class SOM(object):
                 # of them are similar, their difference are expected to be small
                 # enough to detect it here.
                 if epoch_error[i] <= tol or \
-                        np.all(np.abs(np.diff(epoch_error[i - 5:i])) <= 1.0e-4):
+                        np.all(np.abs(np.diff(epoch_error[i - 5:i])) <= 1.0e-5):
                     # Change the flag and record the final iteration.
                     has_converged = (True, i)
 
@@ -592,13 +592,11 @@ class SOM(object):
         of the nearest matching unit.
 
         Args:
-        -----
-        X : ndarray
+            - X : ndarray
             An ndarray of shape (n, self._d) where 'n' is the number of samples.
 
         Returns:
-        --------
-        predicted_labels : ndarray
+            - predicted_labels : ndarray
             An ndarray of shape (n,). The predicted cluster index for each item
             in X.
         """
@@ -675,6 +673,13 @@ class SOM(object):
                     f5.create_dataset("epoch_error", data=self.errors)
                 else:
                     raise RuntimeError("Error statistics are missing.")
+                # _end_if_
+
+                # Check if the learning rates exists as attribute.
+                if hasattr(self, "eta"):
+                    f5.create_dataset("epoch_eta", data=self.eta)
+                else:
+                    raise RuntimeError("Learning rates are missing.")
                 # _end_if_
 
             # _end_with_file_
