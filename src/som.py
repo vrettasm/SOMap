@@ -253,7 +253,7 @@ class SOM(object):
 
     # Local RBF kernel function.
     @staticmethod
-    def rbf(u: np.array, sig: float) -> np.array:
+    def rbf(u: np.array, sig: float = 1.0) -> np.array:
         return np.array([np.exp(-0.5 * x.dot(x) / sig) for x in u])
     # _end_def_
 
@@ -505,14 +505,14 @@ class SOM(object):
         # Converged tuple: (flag, iteration).
         has_converged = (False, 0)
 
+        # Preallocate the grid space to be used for estimating the errors.
+        grid_i = np.zeros_like(self._neurons)
+
         # Display message.
         print(" SOM training started ...")
 
         # Start timing.
-        start_t = time.time()
-
-        # Preallocate the grid space to be used for estimating the errors.
-        grid_i = np.zeros_like(self._neurons)
+        start_t = time.perf_counter()
 
         # Run maximum 'epoch' iterations.
         for i in range(nit):
@@ -570,7 +570,7 @@ class SOM(object):
         # _end_epochs_
 
         # Stop timing.
-        stop_t = time.time()
+        stop_t = time.perf_counter()
 
         # Display time info.
         print(" Training process ended in: {0:.3f} sec.".format(stop_t - start_t))
@@ -624,12 +624,12 @@ class SOM(object):
 
         # Check to make sure SOM has been fit.
         if not self._is_trained:
-            raise RuntimeError(" SOM object is not trained yet.")
+            raise RuntimeError(" SOM.predict: Object is not trained yet.")
         # _end_if_
 
         # Check the dimensions of the input data.
         if X.shape[1] != self._d:
-            raise RuntimeError(" Dimensions mismatch.")
+            raise RuntimeError(" SOM.predict: Dimensions mismatch.")
         # _end_if_
 
         # An array with all the predicted index values.
@@ -669,7 +669,7 @@ class SOM(object):
 
         # Check to make sure SOM has been fit.
         if not self._is_trained:
-            raise RuntimeError(" SOM.saveNetToHDF: SOM object is not trained yet.")
+            raise RuntimeError(" SOM.save_som_to_hdf: SOMap object is not trained yet.")
         # _end_if_
 
         # Import the HDF5 File locally.
@@ -705,7 +705,7 @@ class SOM(object):
 
             # _end_with_file_
         except Exception as e0:
-            print(" SOM.saveMapToHDF: Unable to save the network. {0}".format(e0))
+            print(f" SOM.save_som_to_hdf: Unable to save the network. {e0}")
         # _end_try_
 
     # _end_def_
