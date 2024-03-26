@@ -7,6 +7,7 @@ from numba import njit
 from pathlib import Path
 from datetime import datetime
 from scipy.spatial import distance
+from numpy import unravel_index
 from numpy.linalg import norm as la_norm
 
 # Public interface.
@@ -37,9 +38,9 @@ class SOM(object):
 
     3) Traverse each node in the map:
        3.1) Use the Euclidean distance formula (i.e. norm) to find similarities
-            between the input vector and the map's weight vectors
+            between the input vector and the map's weight vectors.
        3.2) Track the node that produces the smallest distance (this node is the
-            best matching unit -- BMU)
+            best matching unit -- BMU).
 
     4) Update the weight vectors of the nodes in the neighborhood of the BMU
     (including the BMU itself) by pulling them closer to the input vector.
@@ -58,12 +59,12 @@ class SOM(object):
         always the same as the size of the input vectors 'd'.
 
         Args:
-        - m: grid size (m x m).
+        - m: grid shape is assumed square (m x m).
         - d: neuron size (always same as input vector size).
         - u_range: the range of the uniform numbers in the initialization
         (default=(-1, 1)).
-        - metric: string determining the way to compute the distance between
-        the nodes in the update stage.
+        - metric: string determining the way to compute the 'distance' between
+        the nodes weights in the update stage.
 
         Supported metrics are: all the scipy.spatial.distances with default
         parameters.
@@ -155,7 +156,7 @@ class SOM(object):
     def shape(self):
         """
         Description:
-        Returns the full shape of the SOM network (e.g. MxMxd).
+        Returns the full 3D shape of the SOM network (e.g. M x M x d).
         """
         return self._neurons.shape
 
@@ -221,7 +222,8 @@ class SOM(object):
             - vec: input vector with the training sample (dx1).
 
         Returns:
-            - a tuple with the coordinates, on the map, of the winner node (best matching unit).
+            - a tuple with the coordinates, on the grid-map, of the winner node
+            (i.e. best matching unit).
 
         Note:
         We use vectorization to speed up performance. This is optimized for the default
@@ -231,9 +233,11 @@ class SOM(object):
 
         # For the default metric use linalg.norm instead.
         if self._metric == 'euclidean':
+
             # Find the Euclidean distances (vectorized).
             ri = la_norm(self._neurons - vec, ord=2, axis=2)
         else:
+
             # Get the distances with the selected metric.
             ri = distance.cdist(self._neurons.reshape(self._m * self._m, self._d),
                                 vec.reshape(1, self._d), metric=self._metric)
@@ -243,14 +247,14 @@ class SOM(object):
         # _end_if_
 
         # Return the coordinates of the Best Matching Unit (node).
-        return np.unravel_index(np.argmin(ri, axis=None), ri.shape)
+        return unravel_index(np.argmin(ri, axis=None), ri.shape)
 
     # _end_def_
 
     # Local RBF kernel function.
     @staticmethod
-    def rbf(u: np.array, sig: float) -> float:
-        return np.exp(-0.5 * u.dot(u) / sig)
+    def rbf(u: np.array, sig: float) -> np.array:
+        return np.array([np.exp(-0.5 * x.dot(x) / sig) for x in u])
     # _end_def_
 
     # Local bounds check function.
@@ -277,7 +281,7 @@ class SOM(object):
         Note(1):
         The nodes are updated according to:
         n_{i} = n_{i} + u_{i}*eta*(x_{j} - n_{i}), where:
-            - n_{i} is the i-th node (vector)
+            - n_{i} is the i-th node (vector).
             - u_{i} is a function (Gaussian in this case) that defines how the neighbours
               around the center node are going to be affected.
             - eta is the learning rate.
@@ -305,7 +309,10 @@ class SOM(object):
         # Estimate the local radius, around the center: [0, r_max].
         r_loc = int(r_max * 0.98 ** tk)
 
-        # Update all the neighbouring neurons.
+        # Predefine the lists of indexes.
+        i_row, j_col, r_diff = [], [], []
+
+        # Find the affected neighbourhood.
         # NB: The '+1' is added because the upper limit is exclusive.
         for i in range(row - r_loc, row + r_loc + 1):
 
@@ -321,14 +328,21 @@ class SOM(object):
                     continue
                 # _end_check_
 
-                # Get the difference of the current node from the centroid.
-                d_ij = mu - [i, j]
+                # Get the indexes (in pairs).
+                i_row.append(i)
+                j_col.append(j)
 
-                # Update the weights.
-                self._neurons[i, j] += eta * self.rbf(d_ij, sigma) * (vec - self._neurons[i, j])
+                # Get the difference of the current node from the centroid.
+                r_diff.append(mu - [i, j])
             # _end_columns_
 
         # _end_rows_
+
+        # Compute the RBF kernel for all vectors in the list.
+        rbf_arr = self.rbf(r_diff, sigma).reshape(-1, 1)
+
+        # Update the weights (with one vectorized call).
+        self._neurons[i_row, j_col] += eta * rbf_arr * (vec - self._neurons[i_row, j_col])
 
     # _end_def_
 
@@ -424,19 +438,20 @@ class SOM(object):
 
     # _end_def_
 
-    def train(self, x: np.ndarray, epochs: int = 100, tol: float = 1.0e-6, l_rate: float = None,
-              n_update: int = 10):
+    def train(self, x: np.ndarray, epochs: int = 100, tol: float = 1.0e-6,
+              l_rate: float = None, n_update: int = 10, shuffle_input: bool = False):
         """
         Description:
         Train the network for 'epochs' iterations. This is the main fitting process.
 
         Args:
-            - x: training dataset (N x D)
-            - epochs: maximum number of iterations
-            - tol: tolerance to terminate the fit process
+            - x: training dataset (N x D).
+            - epochs: maximum number of iterations.
+            - tol: tolerance to terminate the fit process.
             - l_rate: learning rate (e.g. 0.01). If no value is given it will
               use a slowly decaying exponential function and will reduce in runtime.
-            - n_update: number of iterations to display progress
+            - n_update: number of iterations to display progress.
+            - shuffle_input: if 'True' it will shuffle the input data periodically.
         """
         # Local learning rate function.
         if l_rate:
@@ -496,11 +511,14 @@ class SOM(object):
         # Start timing.
         start_t = time.time()
 
+        # Preallocate the grid space to be used for estimating the errors.
+        grid_i = np.zeros_like(self._neurons)
+
         # Run maximum 'epoch' iterations.
         for i in range(nit):
 
             # Initial copy of the network.
-            grid_i = self._neurons.copy()
+            np.copyto(grid_i, self._neurons)
 
             # Run through all the input vectors.
             for j in x_range:
@@ -539,12 +557,16 @@ class SOM(object):
             # Every N_UPDATES epochs.
             if (i + 1) % n_update == 0:
                 # Display progress so far.
-                print(" [{0}]: Epoch {1}: Error {2:.6f}".
+                print(" [{0}] -> Epoch {1}: Error {2:.6f}".
                       format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), i + 1, epoch_error[i]))
 
                 # Perturb the order of input vectors.
-                self._rng.shuffle(x_range)
+                if shuffle_input:
+                    self._rng.shuffle(x_range)
+                # _end_shuffle_
+
             # _end_update_
+
         # _end_epochs_
 
         # Stop timing.
@@ -588,17 +610,16 @@ class SOM(object):
 
     def predict(self, X):
         """
-        Predict cluster for each element in X, by estimating the position
-        of the nearest matching unit.
+        Predict the cluster for each element in X, by estimating the position
+        of the nearest matching unit on the trained grid.
 
         Args:
-            - X : ndarray
-            An ndarray of shape (n, self._d) where 'n' is the number of samples.
+            - X: An array of shape (n, self._d) where 'n' is the number of
+            samples.
 
         Returns:
-            - predicted_labels : ndarray
-            An ndarray of shape (n,). The predicted cluster index for each item
-            in X.
+            - predicted_labels: An ndarray of shape (n,). The predicted cluster
+            row/col for each item in X.
         """
 
         # Check to make sure SOM has been fit.
