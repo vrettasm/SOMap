@@ -367,7 +367,7 @@ class SOM(object):
             self._uMat *= 0
         # _end_check_
 
-        # Get the dimensions of the U-Matrix
+        # Get the dimensions of the U-Matrix.
         _m, _n = self._uMat.shape
 
         # Step -1-
