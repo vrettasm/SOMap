@@ -253,7 +253,7 @@ class SOM(object):
 
     # Local RBF kernel function.
     @staticmethod
-    def rbf(u: np.array, sig: float = 1.0) -> np.array:
+    def rbf_kernel(u: np.array, sig: float = 1.0) -> np.array:
         return np.array([np.exp(-0.5 * x.dot(x) / sig) for x in u])
     # _end_def_
 
@@ -265,7 +265,7 @@ class SOM(object):
         return lx < 0 or lx >= upper_bound
     # _end_def_
 
-    def _update_nodes(self, t_node: tuple, vec: np.array, eta: float, tk: int):
+    def update_nodes(self, t_node: tuple, vec: np.array, eta: float, tk: int):
         """
         Description:
         Updates the nodes (weights of the network) by centering the peak at the t_node.
@@ -309,8 +309,8 @@ class SOM(object):
         # Estimate the local radius, around the center: [0, r_max].
         r_loc = int(r_max * 0.98 ** tk)
 
-        # Predefine the lists of indexes.
-        i_row, j_col, r_diff = [], [], []
+        # Predefine the auxiliary lists.
+        xy_pair, r_diff = [], []
 
         # Find the affected neighbourhood.
         # NB: The '+1' is added because the upper limit is exclusive.
@@ -329,8 +329,7 @@ class SOM(object):
                 # _end_check_
 
                 # Get the indexes (in pairs).
-                i_row.append(i)
-                j_col.append(j)
+                xy_pair.append((i, j))
 
                 # Get the difference of the current node from the centroid.
                 r_diff.append(mu - [i, j])
@@ -339,10 +338,14 @@ class SOM(object):
         # _end_rows_
 
         # Compute the RBF kernel for all vectors in the list.
-        rbf_arr = self.rbf(r_diff, sigma).reshape(-1, 1)
+        rbf_arr = self.rbf_kernel(r_diff, sigma).reshape(-1, 1)
+
+        # Unpack the indexes in separate lists.
+        x_row = [p[0] for p in xy_pair]
+        y_col = [p[1] for p in xy_pair]
 
         # Update the weights (with one vectorized call).
-        self._neurons[i_row, j_col] += eta * rbf_arr * (vec - self._neurons[i_row, j_col])
+        self._neurons[x_row, y_col] += eta * rbf_arr * (vec - self._neurons[x_row, y_col])
 
     # _end_def_
 
@@ -527,7 +530,7 @@ class SOM(object):
 
                 # Update the neuron values. All the nodes are
                 # updated with the same learning rate: eta(i).
-                self._update_nodes(bmu_node, x[j], eta(i), i)
+                self.update_nodes(bmu_node, x[j], eta(i), i)
             # _end_samples_
 
             # NOTE: Here we use the mean absolute error (MAE).
@@ -614,8 +617,7 @@ class SOM(object):
         of the nearest matching unit on the trained grid.
 
         Args:
-            - X: An array of shape (n, self._d) where 'n' is the number of
-            samples.
+            - X: An array of shape (n, self._d) where 'n' is the number of samples.
 
         Returns:
             - predicted_labels: An ndarray of shape (n,). The predicted cluster
