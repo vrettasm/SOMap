@@ -29,11 +29,13 @@ class TestSOM(unittest.TestCase):
 
     def test_out_of_bounds(self) -> None:
         """
-        Test the out_of_bounds(upper, lower) function.
+        Test the out_of_bounds(upper, idx) function.
+        The valid functionality is [0 <= idx <= upper].
 
         :return: None.
         """
-        self.assertTrue(self.test_som.out_of_bounds(10, 20))
+        idx = 15
+        self.assertTrue(self.test_som.out_of_bounds(10, idx))
     # _end_def_
 
     def test_init(self) -> None:
